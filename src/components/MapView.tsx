@@ -3,7 +3,7 @@
 import { useEffect, useRef } from 'react';
 import mapboxgl from 'mapbox-gl';
 import { Agency, AgencyWithDistance, GeocodingResult, RouteInfo } from '@/lib/types';
-import { CDMX_CENTER, DEFAULT_ZOOM, ROUTE_COLORS } from '@/lib/constants';
+import { CDMX_CENTER, DEFAULT_ZOOM, ROUTE_COLORS, MAPBOX_TOKEN } from '@/lib/constants';
 
 interface MapViewProps {
   agencies: Agency[];
@@ -27,7 +27,7 @@ export default function MapView({
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return;
 
-    mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || '';
+    mapboxgl.accessToken = MAPBOX_TOKEN;
 
     const map = new mapboxgl.Map({
       container: mapContainerRef.current,

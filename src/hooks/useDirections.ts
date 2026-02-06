@@ -1,7 +1,6 @@
 import { useState, useCallback } from 'react';
 import { RouteInfo } from '@/lib/types';
-
-const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
+import { MAPBOX_TOKEN } from '@/lib/constants';
 const PROFILES = ['mapbox/driving', 'mapbox/walking', 'mapbox/cycling'] as const;
 
 export function useDirections() {
