@@ -19,4 +19,4 @@ export const TRANSPORT_LABELS: Record<string, { label: string; icon: string }> =
 export const CKAN_API_URL =
   'https://datos.cdmx.gob.mx/api/3/action/datastore_search?resource_id=e040c46f-8f49-4190-89d1-c08679ca2218&limit=200';
 
-export const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || '';
+export const MAPBOX_TOKEN = (process.env.NEXT_PUBLIC_MAPBOX_TOKEN || '').trim();
