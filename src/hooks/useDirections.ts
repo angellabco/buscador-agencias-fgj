@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { RouteInfo } from '@/lib/types';
 
+const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 const PROFILES = ['mapbox/driving', 'mapbox/walking', 'mapbox/cycling'] as const;
 
 export function useDirections() {
@@ -15,9 +16,8 @@ export function useDirections() {
 
       const results = await Promise.allSettled(
         PROFILES.map(async (profile) => {
-          const res = await fetch(
-            `/api/directions?profile=${profile}&coordinates=${coordinates}`
-          );
+          const url = `https://api.mapbox.com/directions/v5/${profile}/${coordinates}?geometries=geojson&overview=full&steps=false&access_token=${MAPBOX_TOKEN}`;
+          const res = await fetch(url);
           const data = await res.json();
           const route = data.routes?.[0];
           if (!route) throw new Error(`No hay ruta para ${profile}`);

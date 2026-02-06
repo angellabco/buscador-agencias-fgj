@@ -3,6 +3,9 @@
 import { useState, useRef, useCallback } from 'react';
 import { GeocodingResult } from '@/lib/types';
 
+const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
+const CDMX_BBOX = '-99.365,19.05,-98.94,19.59';
+
 interface SearchPanelProps {
   onLocationSelect: (result: GeocodingResult) => void;
   isLoading: boolean;
@@ -36,12 +39,20 @@ export default function SearchPanel({ onLocationSelect, isLoading }: SearchPanel
 
       debounceRef.current = setTimeout(async () => {
         try {
-          const res = await fetch(`/api/geocode?q=${encodeURIComponent(value)}`);
+          const url = new URL('https://api.mapbox.com/search/geocode/v6/forward');
+          url.searchParams.set('q', value);
+          url.searchParams.set('access_token', MAPBOX_TOKEN || '');
+          url.searchParams.set('bbox', CDMX_BBOX);
+          url.searchParams.set('country', 'MX');
+          url.searchParams.set('language', 'es');
+          url.searchParams.set('limit', '5');
+
+          const res = await fetch(url.toString());
           const data = await res.json();
 
           if (data.features) {
             const results: Suggestion[] = data.features.map((f: any) => ({
-              id: f.id,
+              id: f.id || f.properties?.mapbox_id || Math.random().toString(),
               placeName: f.properties?.full_address || f.properties?.name || '',
               latitude: f.geometry?.coordinates?.[1] ?? 0,
               longitude: f.geometry?.coordinates?.[0] ?? 0,
