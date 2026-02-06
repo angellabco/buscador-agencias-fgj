@@ -7,7 +7,7 @@ import AgencyCard from '@/components/AgencyCard';
 import RouteOptions from '@/components/RouteOptions';
 import { useAgencies } from '@/hooks/useAgencies';
 import { useDirections } from '@/hooks/useDirections';
-import { findNearestAgency } from '@/lib/agencies';
+import { findNearestAgencies } from '@/lib/agencies';
 import { GeocodingResult, AgencyWithDistance } from '@/lib/types';
 
 const MapView = dynamic(() => import('@/components/MapView'), { ssr: false });
@@ -17,9 +17,24 @@ export default function Home() {
   const { routes, isLoading: routesLoading, fetchAllRoutes } = useDirections();
 
   const [userLocation, setUserLocation] = useState<GeocodingResult | null>(null);
+  const [nearestAgencies, setNearestAgencies] = useState<AgencyWithDistance[]>([]);
   const [selectedAgency, setSelectedAgency] = useState<AgencyWithDistance | null>(null);
   const [activeProfile, setActiveProfile] = useState('driving');
   const [searchLoading, setSearchLoading] = useState(false);
+
+  const selectAgency = useCallback(
+    async (agency: AgencyWithDistance, location: GeocodingResult) => {
+      setSelectedAgency(agency);
+      setActiveProfile('driving');
+      await fetchAllRoutes(
+        location.longitude,
+        location.latitude,
+        agency.longitude,
+        agency.latitude
+      );
+    },
+    [fetchAllRoutes]
+  );
 
   const handleLocationSelect = useCallback(
     async (result: GeocodingResult) => {
@@ -28,20 +43,27 @@ export default function Home() {
       setSearchLoading(true);
       setUserLocation(result);
 
-      const nearest = findNearestAgency(agencies, result.latitude, result.longitude);
-      setSelectedAgency(nearest);
-      setActiveProfile('driving');
+      const top3 = findNearestAgencies(agencies, result.latitude, result.longitude, 3);
+      setNearestAgencies(top3);
 
-      await fetchAllRoutes(
-        result.longitude,
-        result.latitude,
-        nearest.longitude,
-        nearest.latitude
-      );
+      // Auto-select the closest one and fetch routes
+      if (top3.length > 0) {
+        await selectAgency(top3[0], result);
+      }
 
       setSearchLoading(false);
     },
-    [agencies, fetchAllRoutes]
+    [agencies, selectAgency]
+  );
+
+  const handleAgencyClick = useCallback(
+    async (agency: AgencyWithDistance) => {
+      if (!userLocation) return;
+      setSearchLoading(true);
+      await selectAgency(agency, userLocation);
+      setSearchLoading(false);
+    },
+    [userLocation, selectAgency]
   );
 
   const activeRoute = routes.get(activeProfile) || null;
@@ -88,7 +110,7 @@ export default function Home() {
           )}
 
           {/* Empty state */}
-          {!agenciesLoading && !selectedAgency && !agenciesError && (
+          {!agenciesLoading && nearestAgencies.length === 0 && !agenciesError && (
             <div className="text-center py-8 px-4">
               <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <svg className="w-8 h-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -97,7 +119,7 @@ export default function Home() {
                 </svg>
               </div>
               <p className="text-sm text-gray-600 leading-relaxed">
-                Ingresa tu dirección para encontrar la agencia del Ministerio Público más cercana
+                Ingresa tu dirección para encontrar las 3 agencias del Ministerio Público más cercanas
               </p>
               <p className="text-xs text-gray-400 mt-2">
                 {agencies.length > 0 ? `${agencies.length} agencias disponibles en CDMX` : ''}
@@ -105,13 +127,27 @@ export default function Home() {
             </div>
           )}
 
-          {/* Agency card */}
-          {selectedAgency && (
+          {/* 3 Agency cards */}
+          {nearestAgencies.length > 0 && (
             <div className="space-y-4">
-              <AgencyCard agency={selectedAgency} />
+              <h4 className="text-sm font-semibold text-gray-700 px-1">
+                3 agencias más cercanas
+              </h4>
 
-              {/* Route options */}
-              {userLocation && (
+              <div className="space-y-2">
+                {nearestAgencies.map((agency, index) => (
+                  <AgencyCard
+                    key={agency._id}
+                    agency={agency}
+                    rank={index + 1}
+                    isSelected={selectedAgency?._id === agency._id}
+                    onClick={() => handleAgencyClick(agency)}
+                  />
+                ))}
+              </div>
+
+              {/* Route options for selected agency */}
+              {selectedAgency && userLocation && (
                 <RouteOptions
                   routes={routes}
                   activeProfile={activeProfile}
@@ -149,6 +185,7 @@ export default function Home() {
         <MapView
           agencies={agencies}
           userLocation={userLocation}
+          nearestAgencies={nearestAgencies}
           selectedAgency={selectedAgency}
           activeRoute={activeRoute}
         />

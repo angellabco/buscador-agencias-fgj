@@ -8,6 +8,7 @@ import { CDMX_CENTER, DEFAULT_ZOOM, ROUTE_COLORS, MAPBOX_TOKEN } from '@/lib/con
 interface MapViewProps {
   agencies: Agency[];
   userLocation: GeocodingResult | null;
+  nearestAgencies: AgencyWithDistance[];
   selectedAgency: AgencyWithDistance | null;
   activeRoute: RouteInfo | null;
 }
@@ -15,13 +16,14 @@ interface MapViewProps {
 export default function MapView({
   agencies,
   userLocation,
+  nearestAgencies,
   selectedAgency,
   activeRoute,
 }: MapViewProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const userMarkerRef = useRef<mapboxgl.Marker | null>(null);
-  const agencyMarkerRef = useRef<mapboxgl.Marker | null>(null);
+  const agencyMarkersRef = useRef<mapboxgl.Marker[]>([]);
 
   // Initialize map
   useEffect(() => {
@@ -125,35 +127,46 @@ export default function MapView({
     }
   }, [userLocation]);
 
-  // Update agency marker
+  // Update agency markers (top 3)
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
 
-    if (agencyMarkerRef.current) {
-      agencyMarkerRef.current.remove();
-      agencyMarkerRef.current = null;
-    }
+    // Remove old markers
+    agencyMarkersRef.current.forEach((m) => m.remove());
+    agencyMarkersRef.current = [];
 
-    if (selectedAgency) {
+    // Add numbered markers for each nearest agency
+    nearestAgencies.forEach((agency, index) => {
+      const isSelected = selectedAgency?._id === agency._id;
       const el = document.createElement('div');
-      el.innerHTML = `<div style="width:32px;height:32px;background:#7C1034;border:3px solid white;border-radius:50%;box-shadow:0 2px 10px rgba(124,16,52,0.4);display:flex;align-items:center;justify-content:center;">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
-      </div>`;
+      el.innerHTML = `<div style="
+        width:36px;height:36px;
+        background:${isSelected ? '#7C1034' : '#7C1034CC'};
+        border:3px solid ${isSelected ? '#fff' : '#ffffffaa'};
+        border-radius:50%;
+        box-shadow:0 2px 10px ${isSelected ? 'rgba(124,16,52,0.5)' : 'rgba(124,16,52,0.25)'};
+        display:flex;align-items:center;justify-content:center;
+        color:white;font-weight:bold;font-size:16px;
+        transform:${isSelected ? 'scale(1.15)' : 'scale(1)'};
+        transition:all 0.2s;
+      ">${index + 1}</div>`;
 
-      agencyMarkerRef.current = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
-        .setLngLat([selectedAgency.longitude, selectedAgency.latitude])
+      const marker = new mapboxgl.Marker({ element: el, anchor: 'center' })
+        .setLngLat([agency.longitude, agency.latitude])
         .addTo(map);
-    }
 
-    // Fit bounds to include both user and agency
-    if (userLocation && selectedAgency) {
+      agencyMarkersRef.current.push(marker);
+    });
+
+    // Fit bounds to include user + all nearest agencies
+    if (userLocation && nearestAgencies.length > 0) {
       const bounds = new mapboxgl.LngLatBounds();
       bounds.extend([userLocation.longitude, userLocation.latitude]);
-      bounds.extend([selectedAgency.longitude, selectedAgency.latitude]);
-      map.fitBounds(bounds, { padding: 80, maxZoom: 15 });
+      nearestAgencies.forEach((a) => bounds.extend([a.longitude, a.latitude]));
+      map.fitBounds(bounds, { padding: 80, maxZoom: 14 });
     }
-  }, [selectedAgency, userLocation]);
+  }, [nearestAgencies, selectedAgency, userLocation]);
 
   // Update route line
   useEffect(() => {
